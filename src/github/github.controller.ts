@@ -56,4 +56,14 @@ export class GithubController {
       res.status(500).json({ error: 'Failed to fetch bounties', details: err.message });
     }
   }
+
+  @Post('recommend-bounties')
+  async recommendBounties(@Body('prompt') prompt: string, @Res() res: Response) {
+    try {
+      const result = await this.githubService.recommendBounties(prompt);
+      res.status(200).json(result);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to recommend bounties', details: err.message });
+    }
+  }
 } 

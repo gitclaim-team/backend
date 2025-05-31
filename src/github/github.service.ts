@@ -4,6 +4,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Bounty } from './bounty.model';
 import axios from 'axios';
+import { ConfigService } from '@nestjs/config';
+import { OpenAI } from 'openai';
 
 @Injectable()
 export class GithubService implements OnModuleInit {
@@ -12,6 +14,7 @@ export class GithubService implements OnModuleInit {
 
   constructor(
     @InjectModel(Bounty.name) private bountyModel: Model<Bounty>,
+    private configService: ConfigService,
   ) {}
 
   onModuleInit() {
@@ -133,5 +136,124 @@ export class GithubService implements OnModuleInit {
     } else {
       return this.bountyModel.find().sort({ createdAt: -1 }).exec();
     }
+  }
+
+  /**
+   * Recommend bounties based on a natural language prompt using OpenAI o3-mini.
+   * Returns top 10 bounties, ranked languages, and a recommendation summary.
+   */
+  async recommendBounties(prompt: string): Promise<any> {
+    const openai = new OpenAI({ apiKey: this.configService.get('OPENAI_API_KEY') });
+    // Provide a sample bounty document for context
+    const sample = {
+      repo: 'https://github.com/example/repo',
+      issue: 123,
+      amount: 100,
+      coin: 'USDC',
+      chain_id: '1',
+      bountyOwner: 'octocat',
+      status: 'open',
+      languages: [
+        { language: 'Solidity', percentage: 38.12 },
+        { language: 'Go', percentage: 82.46 }
+      ]
+    };
+    const systemPrompt = `You are an assistant that:
+- Extracts and ranks programming languages from a user's description of their skills.
+- Generates a MongoDB filter for the Bounty model, which has a 'languages' array of objects with 'language' (capitalized, e.g., "Solidity", "Go") and 'percentage' (0–100).
+- If the user mentions 'golang', use 'Go' as the language name.
+- The filter should match bounties where the most important languages from the user's prompt are present in the 'languages' array, with percentage >= 10.
+- Also, provide a ranked list of languages and a short recommendation summary for the user.
+- Return a JSON object with keys: filter, ranked_languages, recommendation.`;
+    const userPrompt = `User description: "${prompt}"
+Sample bounty document: ${JSON.stringify(sample)}
+`;
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo-0125', // o3-mini
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.2,
+      max_tokens: 512
+    });
+    let filter = {};
+    let ranked_languages: string[] = [];
+    let recommendation = '';
+    try {
+      const response = JSON.parse(completion.choices[0].message.content);
+      filter = response.filter;
+      ranked_languages = response.ranked_languages;
+      recommendation = response.recommendation;
+    } catch (e) {
+      throw new Error('LLM did not return valid JSON: ' + completion.choices[0].message.content);
+    }
+    // Log the LLM-generated filter for debugging
+    console.log('LLM filter:', JSON.stringify(filter, null, 2));
+    // Language alias mapping
+    const languageAliasMap: Record<string, string> = {
+      'golang': 'Go',
+      'go': 'Go',
+      'typescript': 'TypeScript',
+      'js': 'JavaScript',
+      'py': 'Python',
+      'solidity': 'Solidity',
+      // Add more aliases as needed
+    };
+    // Normalize ranked_languages
+    ranked_languages = ranked_languages.map(lang => languageAliasMap[lang.toLowerCase()] || lang);
+    // Normalize filter: if it uses $elemMatch, update language names
+    if (
+      filter &&
+      typeof filter === 'object' &&
+      'languages' in filter &&
+      filter.languages &&
+      typeof filter.languages === 'object' &&
+      '$elemMatch' in filter.languages &&
+      filter.languages.$elemMatch &&
+      typeof filter.languages.$elemMatch === 'object' &&
+      'language' in filter.languages.$elemMatch
+    ) {
+      const lang = filter.languages.$elemMatch.language;
+      if (typeof lang === 'string') {
+        filter.languages.$elemMatch.language = languageAliasMap[lang.toLowerCase()] || lang;
+      }
+    }
+    // Query the bounties using the generated filter
+    const bounties = await this.bountyModel.aggregate([
+      { $match: filter },
+      { $addFields: {
+        matchScore: {
+          $sum: ranked_languages.map((lang, idx) => ({
+            $let: {
+              vars: {
+                langObj: {
+                  $first: {
+                    $filter: {
+                      input: "$languages",
+                      as: "l",
+                      cond: { $eq: ["$$l.language", lang] }
+                    }
+                  }
+                }
+              },
+              in: {
+                $multiply: [
+                  { $ifNull: ["$$langObj.percentage", 0] },
+                  1 / (idx + 1)
+                ]
+              }
+            }
+          }))
+        }
+      } },
+      { $sort: { matchScore: -1, createdAt: -1 } },
+      { $limit: 10 }
+    ]);
+    return {
+      bounties,
+      ranked_languages,
+      recommendation
+    };
   }
 } 
