@@ -1,11 +1,11 @@
 # Use official Node.js 22 image
-FROM node:22-slim AS base
+FROM node:22-bullseye AS base
 
 # Install pnpm globally
 RUN npm install -g pnpm@10.11.0
 
 # Install curl
-RUN apt-get update && apt-get install -y curl git ca-certificates  && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y curl git ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Install Foundry (forge)
 RUN curl -L https://foundry.paradigm.xyz | bash && /root/.foundry/bin/foundryup
@@ -13,6 +13,7 @@ ENV PATH="/root/.foundry/bin:${PATH}"
 
 # Install vlayer
 RUN curl -SL https://install.vlayer.xyz | bash
+RUN . /root/.bashrc && vlayerup
 
 # Set working directory
 WORKDIR /app
