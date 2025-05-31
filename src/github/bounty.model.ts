@@ -1,0 +1,35 @@
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document } from 'mongoose';
+
+@Schema({ timestamps: true })
+export class Bounty extends Document {
+  @Prop({ required: true })
+  repo: string;
+
+  @Prop({ required: true })
+  issue: number;
+
+  @Prop({ required: true })
+  amount: number;
+
+  @Prop({ required: true })
+  coin: string; // Coin ticker, e.g., USDC, USDT
+
+  @Prop({ required: true })
+  chain_id: string;
+
+  @Prop({ required: true })
+  bountyOwner: string; // GitHub handle of the person issuing the bounty
+
+  @Prop({ default: 'open' })
+  status: string; // open, closed, etc.
+}
+
+export const BountySchema = SchemaFactory.createForClass(Bounty);
+
+BountySchema.set('toJSON', {
+  transform: (doc, ret) => {
+    delete ret.__v;
+    return ret;
+  },
+}); 

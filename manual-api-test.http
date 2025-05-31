@@ -1,0 +1,21 @@
+### Get issues in repos the app has access to
+GET http://localhost:3000/github/issues?installationId=YOUR_INSTALLATION_ID
+Accept: application/json
+
+### Create a bounty
+POST http://localhost:3000/github/bounties
+Content-Type: application/json
+Accept: application/json
+
+{
+  "repo": "example-repo",
+  "issue": 123,
+  "amount": 100,
+  "coin": "USDC",
+  "chain_id": "1",
+  "bountyOwner": "octocat"
+}
+
+### Get bounties by bountyOwner
+GET http://localhost:3000/github/bounties?bountyOwner=octocat
+Accept: application/json 

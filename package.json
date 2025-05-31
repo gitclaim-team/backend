@@ -79,5 +79,10 @@
     "url": "https://github.com/tsdk/create-nestjs-app/issues"
   },
   "homepage": "https://github.com/tsdk/create-nestjs-app",
-  "gitHead": "ac9072902aff8d26df5ab02f85f25af7d1b85bb8"
+  "gitHead": "ac9072902aff8d26df5ab02f85f25af7d1b85bb8",
+  "engines": {
+    "node": "22.x",
+    "pnpm": "10.11.0"
+  },
+  "packageManager": "pnpm@10.11.0"
 }

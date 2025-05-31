@@ -1,10 +1,17 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { Probot, ProbotOctokit } from 'probot';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Bounty } from './bounty.model';
 
 @Injectable()
 export class GithubService implements OnModuleInit {
   private readonly logger = new Logger(GithubService.name);
   private probot: Probot;
+
+  constructor(
+    @InjectModel(Bounty.name) private bountyModel: Model<Bounty>,
+  ) {}
 
   onModuleInit() {
     this.probot = new Probot({
@@ -49,5 +56,44 @@ export class GithubService implements OnModuleInit {
 
   getProbot() {
     return this.probot;
+  }
+
+  // 1. Get issues in repos the app has access to
+  async getAccessibleIssues(installationId: number): Promise<any[]> {
+    // Use Probot's Octokit to list repos and issues
+    const octokit = await this.probot.auth(installationId);
+    const repos = await octokit.apps.listReposAccessibleToInstallation();
+    const issues: any[] = [];
+    for (const repo of repos.data.repositories) {
+      const repoIssues = await octokit.issues.listForRepo({
+        owner: repo.owner.login,
+        repo: repo.name,
+        state: 'open',
+      });
+      issues.push(...repoIssues.data.map(issue => ({
+        ...issue,
+        repo: repo.name,
+        owner: repo.owner.login,
+      })));
+    }
+    return issues;
+  }
+
+  // 2. Create a bounty
+  async createBounty(data: {
+    repo: string;
+    issue: number;
+    amount: number;
+    coin: string;
+    chain_id: string;
+    bountyOwner: string;
+  }): Promise<Bounty> {
+    const bounty = new this.bountyModel(data);
+    return bounty.save();
+  }
+
+  // 3. Get bounties by bountyOwner
+  async getBountiesByOwner(bountyOwner: string): Promise<Bounty[]> {
+    return this.bountyModel.find({ bountyOwner }).sort({ createdAt: -1 }).exec();
   }
 } 

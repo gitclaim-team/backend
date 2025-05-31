@@ -1,8 +1,8 @@
-import { Controller, Post, Req, Res, All } from '@nestjs/common';
+import { Controller, Post, Req, Res, All, Get, Query, Body } from '@nestjs/common';
 import { GithubService } from './github.service';
 import { Request, Response } from 'express';
 
-@Controller('github/webhooks')
+@Controller('github')
 export class GithubController {
   constructor(private readonly githubService: GithubService) {}
 
@@ -21,6 +21,39 @@ export class GithubController {
       res.status(200).send('Event received');
     } catch (err) {
       res.status(500).send('Error processing event');
+    }
+  }
+
+  @Get('issues')
+  async getIssues(@Query('installationId') installationId: string, @Res() res: Response) {
+    try {
+      const issues = await this.githubService.getAccessibleIssues(Number(installationId));
+      res.status(200).json(issues);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch issues', details: err.message });
+    }
+  }
+
+  @Post('bounties')
+  async createBounty(@Body() body: any, @Res() res: Response) {
+    try {
+      if (!body.coin) {
+        return res.status(400).json({ error: 'coin is required' });
+      }
+      const bounty = await this.githubService.createBounty(body);
+      res.status(201).json(bounty);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to create bounty', details: err.message });
+    }
+  }
+
+  @Get('bounties')
+  async getBounties(@Query('bountyOwner') bountyOwner: string, @Res() res: Response) {
+    try {
+      const bounties = await this.githubService.getBountiesByOwner(bountyOwner);
+      res.status(200).json(bounties);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch bounties', details: err.message });
     }
   }
 } 
