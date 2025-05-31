@@ -29,6 +29,24 @@ export class Bounty extends Document {
     default: []
   })
   languages: { language: string; percentage: number }[];
+
+  @Prop({
+    type: [{
+      number: Number,
+      repo: String,
+      url: String,
+      author: String,
+      createdAt: Date
+    }],
+    default: []
+  })
+  pull_requests: {
+    number: number;
+    repo: string;
+    url: string;
+    author: string;
+    createdAt: Date;
+  }[];
 }
 
 export const BountySchema = SchemaFactory.createForClass(Bounty);

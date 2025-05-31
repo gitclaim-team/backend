@@ -4,6 +4,7 @@ import { GithubController } from './github.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Bounty, BountySchema } from './bounty.model';
 import { ConfigModule } from '@nestjs/config';
+import { GithubWebhookController } from './webhook.controller';
 
 @Module({
   imports: [
@@ -11,6 +12,6 @@ import { ConfigModule } from '@nestjs/config';
     ConfigModule,
   ],
   providers: [GithubService],
-  controllers: [GithubController],
+  controllers: [GithubController, GithubWebhookController],
 })
 export class GithubModule {} 

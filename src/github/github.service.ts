@@ -52,6 +52,53 @@ export class GithubService implements OnModuleInit {
       }
     });
 
+    // Listen for cross-referenced events on issues
+    this.probot.on('issues', async (context) => {
+      try {
+        const payload = context.payload as any; // type assertion for cross-referenced event
+        const event = payload.action;
+        if (event !== 'cross-referenced') return;
+        const source = payload.source;
+        const issue = payload.issue;
+        const repo = payload.repository;
+        if (!source || !source.issue || !source.issue.pull_request) {
+          this.logger.log('[cross-referenced] Source is not a PR, skipping.');
+          return;
+        }
+        // Extract PR info
+        const pr = source.issue;
+        const prInfo = {
+          number: pr.number,
+          repo: repo && repo.owner && repo.name ? `${repo.owner.login}/${repo.name}` : 'unknown',
+          url: pr.html_url,
+          author: pr.user?.login || 'unknown',
+          createdAt: pr.created_at ? new Date(pr.created_at) : new Date()
+        };
+        this.logger.log(`[cross-referenced] PR #${prInfo.number} in ${prInfo.repo} references issue #${issue?.number}`);
+        // Find the bounty for this issue and repo
+        if (!issue || !repo || !repo.owner || !repo.name) {
+          this.logger.warn('[cross-referenced] Missing issue or repo info, skipping.');
+          return;
+        }
+        const bounty = await this.bountyModel.findOne({ issue: issue.number, repo: `https://github.com/${repo.owner.login}/${repo.name}` });
+        if (!bounty) {
+          this.logger.warn(`[cross-referenced] No bounty found for issue #${issue.number} in repo ${repo.owner.login}/${repo.name}`);
+          return;
+        }
+        // Check if this PR is already linked
+        if (bounty.pull_requests.some(pr => pr.number === prInfo.number && pr.repo === prInfo.repo)) {
+          this.logger.log(`[cross-referenced] PR #${prInfo.number} already linked to bounty for issue #${issue.number}`);
+          return;
+        }
+        // Add PR info to pull_requests
+        bounty.pull_requests.push(prInfo);
+        await bounty.save();
+        this.logger.log(`[cross-referenced] Linked PR #${prInfo.number} to bounty for issue #${issue.number}`);
+      } catch (err) {
+        this.logger.error(`[cross-referenced] Error handling event: ${err.message}`, err.stack);
+      }
+    });
+
     // Used for debugging:
     // this.probot.onAny(async (context) => {
     //   this.logger.log('Received event:', context.name, context.payload);
