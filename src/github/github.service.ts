@@ -33,9 +33,77 @@ export class GithubService implements OnModuleInit {
     });
 
     this.probot.on('pull_request', async (context) => {
-      if (context.payload.action === 'opened') {
-        const pr = (context.payload as any).pull_request;
-        this.logger.log(`New PR opened: #${pr?.number} - ${pr?.title} by ${pr?.user?.login}`);
+      try {
+        const action = context.payload.action;
+        if (action !== 'opened' && action !== 'edited') return;
+        const pr = context.payload.pull_request;
+        const repo = context.payload.repository;
+        if (!pr || !repo) {
+          this.logger.warn('[pull_request] Missing PR or repo info, skipping.');
+          return;
+        }
+        const prBody = pr.body || '';
+        // GitHub official keywords for closing issues
+        const keywords = [
+          'close', 'closes', 'closed',
+          'fix', 'fixes', 'fixed',
+          'resolve', 'resolves', 'resolved'
+        ];
+        // Improved regex: case-insensitive, word boundary, optional colon/whitespace
+        const refRegex = new RegExp(
+          `\\b(?:${keywords.join('|')})\\b[:\\s]*((?:[\\w-]+\\/[\\w-]+)?#\\d+)`,
+          'gi'
+        );
+        const matches = [...prBody.matchAll(refRegex)];
+        if (matches.length === 0) {
+          this.logger.log(`[pull_request] No issue references found in PR #${pr.number}`);
+          return;
+        }
+        for (const match of matches) {
+          const ref = match[1]; // e.g., #44 or owner/repo#44
+          let issueNumber: number | null = null;
+          let issueRepo = `${repo.owner.login}/${repo.name}`;
+          // Parse reference
+          const crossRepoMatch = ref.match(/^([\w-]+)\/([\w-]+)#(\d+)$/);
+          if (crossRepoMatch) {
+            issueRepo = `${crossRepoMatch[1]}/${crossRepoMatch[2]}`;
+            issueNumber = parseInt(crossRepoMatch[3], 10);
+          } else {
+            const sameRepoMatch = ref.match(/^#(\d+)$/);
+            if (sameRepoMatch) {
+              issueNumber = parseInt(sameRepoMatch[1], 10);
+            }
+          }
+          if (!issueNumber) {
+            this.logger.warn(`[pull_request] Could not parse issue reference '${ref}' in PR #${pr.number}`);
+            continue;
+          }
+          this.logger.log(`[pull_request] PR #${pr.number} references issue #${issueNumber} in repo ${issueRepo}`);
+          // Find the bounty for this issue and repo
+          const bounty = await this.bountyModel.findOne({ issue: issueNumber, repo: `https://github.com/${issueRepo}` });
+          if (!bounty) {
+            this.logger.warn(`[pull_request] No bounty found for issue #${issueNumber} in repo ${issueRepo}`);
+            continue;
+          }
+          // Check if this PR is already linked
+          if (bounty.pull_requests.some(existing => existing.number === pr.number && existing.repo === issueRepo)) {
+            this.logger.log(`[pull_request] PR #${pr.number} already linked to bounty for issue #${issueNumber}`);
+            continue;
+          }
+          // Add PR info to pull_requests
+          const prInfo = {
+            number: pr.number,
+            repo: issueRepo,
+            url: pr.html_url,
+            author: pr.user?.login || 'unknown',
+            createdAt: pr.created_at ? new Date(pr.created_at) : new Date()
+          };
+          bounty.pull_requests.push(prInfo);
+          await bounty.save();
+          this.logger.log(`[pull_request] Linked PR #${pr.number} to bounty for issue #${issueNumber}`);
+        }
+      } catch (err) {
+        this.logger.error(`[pull_request] Error handling PR event: ${err.message}`, err.stack);
       }
     });
 
