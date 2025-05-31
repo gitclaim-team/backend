@@ -19,11 +19,8 @@ RUN pnpm install --frozen-lockfile
 # Copy the rest of the application code
 COPY . .
 
-# Build the app
-RUN pnpm run build
-
 # Expose the default NestJS port
 EXPOSE 3000
 
 # Start the app
-CMD ["node", "dist/main"]
+CMD ["pnpm", "start"]
