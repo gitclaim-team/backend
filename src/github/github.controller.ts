@@ -50,7 +50,7 @@ export class GithubController {
   @Get('bounties')
   async getBounties(@Query('bountyOwner') bountyOwner: string, @Res() res: Response) {
     try {
-      const bounties = await this.githubService.getBountiesByOwner(bountyOwner);
+      const bounties = await this.githubService.getBountiesByOwnerOrAll(bountyOwner);
       res.status(200).json(bounties);
     } catch (err) {
       res.status(500).json({ error: 'Failed to fetch bounties', details: err.message });

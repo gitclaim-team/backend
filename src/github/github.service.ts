@@ -96,4 +96,18 @@ export class GithubService implements OnModuleInit {
   async getBountiesByOwner(bountyOwner: string): Promise<Bounty[]> {
     return this.bountyModel.find({ bountyOwner }).sort({ createdAt: -1 }).exec();
   }
+
+  // 4. Get all bounties
+  async getAllBounties(): Promise<Bounty[]> {
+    return this.bountyModel.find().sort({ createdAt: -1 }).exec();
+  }
+
+  // 5. Get bounties by owner or all
+  async getBountiesByOwnerOrAll(bountyOwner?: string): Promise<Bounty[]> {
+    if (bountyOwner) {
+      return this.bountyModel.find({ bountyOwner }).sort({ createdAt: -1 }).exec();
+    } else {
+      return this.bountyModel.find().sort({ createdAt: -1 }).exec();
+    }
+  }
 } 
