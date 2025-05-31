@@ -4,6 +4,9 @@ FROM node:22-slim AS base
 # Install pnpm globally
 RUN npm install -g pnpm@10.11.0
 
+# Install curl
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 # Install vlayer
 RUN curl -SL https://install.vlayer.xyz | bash
 
