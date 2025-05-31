@@ -3,6 +3,7 @@ import { Probot, ProbotOctokit } from 'probot';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Bounty } from './bounty.model';
+import axios from 'axios';
 
 @Injectable()
 export class GithubService implements OnModuleInit {
@@ -88,7 +89,30 @@ export class GithubService implements OnModuleInit {
     chain_id: string;
     bountyOwner: string;
   }): Promise<Bounty> {
-    const bounty = new this.bountyModel(data);
+    // Validate repo URL
+    const repoUrlPattern = /^https:\/\/github\.com\/([^\/]+)\/([^\/]+)(?:\/)?$/;
+    const match = data.repo.match(repoUrlPattern);
+    if (!match) {
+      throw new Error('Invalid GitHub repository URL. It should be in the form https://github.com/owner/repo');
+    }
+    const owner = match[1];
+    const repo = match[2];
+
+    // Fetch languages from GitHub API
+    let languagesArray = [];
+    try {
+      const response = await axios.get(`https://api.github.com/repos/${owner}/${repo}/languages`);
+      const languages = response.data;
+      const total = (Object.values(languages) as number[]).reduce((sum, val) => sum + val, 0);
+      languagesArray = (Object.entries(languages) as [string, number][]).map(([language, bytes]) => ({
+        language,
+        percentage: total > 0 ? Math.round((bytes / total) * 10000) / 100 : 0 // rounded to 2 decimals
+      }));
+    } catch (err) {
+      throw new Error('Failed to fetch repository languages from GitHub.');
+    }
+
+    const bounty = new this.bountyModel({ ...data, languages: languagesArray });
     return bounty.save();
   }
 

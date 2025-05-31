@@ -23,6 +23,12 @@ export class Bounty extends Document {
 
   @Prop({ default: 'open' })
   status: string; // open, closed, etc.
+
+  @Prop({
+    type: [{ language: String, percentage: Number }],
+    default: []
+  })
+  languages: { language: string; percentage: number }[];
 }
 
 export const BountySchema = SchemaFactory.createForClass(Bounty);
