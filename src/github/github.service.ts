@@ -15,17 +15,36 @@ export class GithubService implements OnModuleInit {
       // octokit: ProbotOctokit.defaults({})
     });
 
-    this.probot.on('installation.created', async (context) => {
-      this.logger.log('GitHub App installed:', context.payload);
-    });
-
-    this.probot.on('issue_comment.created', async (context) => {
-      const issue = context.payload.issue;
-      // Example: Only respond to comments on a specific issue number
-      if (issue.number === 1) {
-        this.logger.log('Comment on issue #1:', context.payload.comment.body);
+    this.probot.on('installation', async (context) => {
+      if (context.payload.action === 'created') {
+        this.logger.log('GitHub App installed:', context.payload);
       }
     });
+
+    this.probot.on('pull_request', async (context) => {
+      if (context.payload.action === 'opened') {
+        const pr = (context.payload as any).pull_request;
+        this.logger.log(`New PR opened: #${pr?.number} - ${pr?.title} by ${pr?.user?.login}`);
+      }
+    });
+
+    this.probot.on('issue_comment', async (context) => {
+      if (context.payload.action === 'created') {
+        const issue = context.payload.issue;
+        const comment = context.payload.comment;
+        // Check if the comment is on a pull request
+        if (issue.pull_request) {
+          this.logger.log(`New comment on PR #${issue.number}: ${comment.body} by ${comment.user.login}`);
+        } else {
+          this.logger.log(`New comment on Issue #${issue.number}: ${comment.body} by ${comment.user.login}`);
+        }
+      }
+    });
+
+    // Used for debugging:
+    // this.probot.onAny(async (context) => {
+    //   this.logger.log('Received event:', context.name, context.payload);
+    // });
   }
 
   getProbot() {
