@@ -1,21 +1,37 @@
+@url = http://localhost:3000
+# @url = https://api.cha-ching.it
+
 ### Get issues in repos the app has access to
-GET http://localhost:3000/github/issues?installationId=YOUR_INSTALLATION_ID
+GET {{ url }}/github/issues?installationId=YOUR_INSTALLATION_ID
 Accept: application/json
 
 ### Create a bounty
-POST http://localhost:3000/github/bounties
+POST {{ url }}/github/bounties
 Content-Type: application/json
 Accept: application/json
 
 {
-  "repo": "example-repo",
-  "issue": 123,
-  "amount": 100,
+  "repo": "https://github.com/cha-ching-team/go-ethereum",
+  "issue": 2,
+  "amount": 989,
   "coin": "USDC",
   "chain_id": "1",
-  "bountyOwner": "octocat"
+  "bountyOwner": "gsmachado"
 }
 
 ### Get bounties by bountyOwner
-GET http://localhost:3000/github/bounties?bountyOwner=octocat
+GET {{ url }}/github/bounties?bountyOwner=gsmachado
 Accept: application/json 
+
+### Get all bounties
+GET {{ url }}/github/bounties
+Accept: application/json 
+
+### Recommend bounties based on user skills
+POST {{ url }}/github/recommend-bounties
+Content-Type: application/json
+Accept: application/json
+
+{
+  "prompt": "I'm good at coding in Java, and I'm learning Kotlin. Looking for bounties that match my skills."
+} 
