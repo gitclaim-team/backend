@@ -6,6 +6,7 @@ import { Bounty } from './bounty.model';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { OpenAI } from 'openai';
+import { ethers } from 'ethers';
 
 @Injectable()
 export class GithubService implements OnModuleInit {
@@ -43,6 +44,8 @@ export class GithubService implements OnModuleInit {
           return;
         }
         const prBody = pr.body || '';
+        // Extract EVM address from PR body
+        const evmAddress = this.extractEvmAddress(prBody);
         // GitHub official keywords for closing issues
         const keywords = [
           'close', 'closes', 'closed',
@@ -85,20 +88,37 @@ export class GithubService implements OnModuleInit {
             this.logger.warn(`[pull_request] No bounty found for issue #${issueNumber} in repo ${issueRepo}`);
             continue;
           }
-          // Check if this PR is already linked
-          if (bounty.pull_requests.some(existing => existing.number === pr.number && existing.repo === issueRepo)) {
-            this.logger.log(`[pull_request] PR #${pr.number} already linked to bounty for issue #${issueNumber}`);
-            continue;
+          // Find or create PR entry
+          let prEntry = bounty.pull_requests.find(existing => existing.number === pr.number && existing.repo === issueRepo);
+          if (!prEntry) {
+            prEntry = {
+              number: pr.number,
+              repo: issueRepo,
+              url: pr.html_url,
+              author: pr.user?.login || 'unknown',
+              createdAt: pr.created_at ? new Date(pr.created_at) : new Date(),
+            };
+            bounty.pull_requests.push(prEntry);
           }
-          // Add PR info to pull_requests
-          const prInfo = {
-            number: pr.number,
-            repo: issueRepo,
-            url: pr.html_url,
-            author: pr.user?.login || 'unknown',
-            createdAt: pr.created_at ? new Date(pr.created_at) : new Date()
-          };
-          bounty.pull_requests.push(prInfo);
+          // If EVM address is found and valid, store and thank
+          if (evmAddress && ethers.isAddress(evmAddress)) {
+            prEntry.evm_address = evmAddress;
+            await bounty.save();
+            await context.octokit.issues.createComment({
+              owner: repo.owner.login,
+              repo: repo.name,
+              issue_number: pr.number,
+              body: `Thanks! Your address is ${evmAddress} and it will be eventually used to pay the bounty.`
+            });
+          } else {
+            // Ask for EVM address if not present or invalid
+            await context.octokit.issues.createComment({
+              owner: repo.owner.login,
+              repo: repo.name,
+              issue_number: pr.number,
+              body: `Hi @${pr.user.login}, please provide your EVM-compatible address (Ethereum address) in a comment below. This address will be used to pay the bounty. Only the PR author can provide this address.`
+            });
+          }
           await bounty.save();
           this.logger.log(`[pull_request] Linked PR #${pr.number} to bounty for issue #${issueNumber}`);
         }
@@ -113,57 +133,29 @@ export class GithubService implements OnModuleInit {
         const comment = context.payload.comment;
         // Check if the comment is on a pull request
         if (issue.pull_request) {
-          this.logger.log(`New comment on PR #${issue.number}: ${comment.body} by ${comment.user.login}`);
-        } else {
-          this.logger.log(`New comment on Issue #${issue.number}: ${comment.body} by ${comment.user.login}`);
+          const repo = context.payload.repository;
+          const prNumber = issue.number;
+          // Find the bounty for this PR
+          const bounty = await this.bountyModel.findOne({ 'pull_requests.number': prNumber, repo: `https://github.com/${repo.owner.login}/${repo.name}` });
+          if (!bounty) return;
+          // Find the PR entry
+          const prEntry = bounty.pull_requests.find(pr => pr.number === prNumber);
+          if (!prEntry) return;
+          // Only accept from PR author and if not already set
+          if (prEntry.author === comment.user.login && !prEntry.evm_address) {
+            const evmAddress = this.extractEvmAddress(comment.body);
+            if (evmAddress && ethers.isAddress(evmAddress)) {
+              prEntry.evm_address = evmAddress;
+              await bounty.save();
+              await context.octokit.issues.createComment({
+                owner: repo.owner.login,
+                repo: repo.name,
+                issue_number: prNumber,
+                body: `Thanks! Your address is ${evmAddress} and it will be eventually used to pay the bounty.`
+              });
+            }
+          }
         }
-      }
-    });
-
-    // Listen for cross-referenced events on issues
-    this.probot.on('issues', async (context) => {
-      try {
-        const payload = context.payload as any; // type assertion for cross-referenced event
-        const event = payload.action;
-        if (event !== 'cross-referenced') return;
-        const source = payload.source;
-        const issue = payload.issue;
-        const repo = payload.repository;
-        if (!source || !source.issue || !source.issue.pull_request) {
-          this.logger.log('[cross-referenced] Source is not a PR, skipping.');
-          return;
-        }
-        // Extract PR info
-        const pr = source.issue;
-        const prInfo = {
-          number: pr.number,
-          repo: repo && repo.owner && repo.name ? `${repo.owner.login}/${repo.name}` : 'unknown',
-          url: pr.html_url,
-          author: pr.user?.login || 'unknown',
-          createdAt: pr.created_at ? new Date(pr.created_at) : new Date()
-        };
-        this.logger.log(`[cross-referenced] PR #${prInfo.number} in ${prInfo.repo} references issue #${issue?.number}`);
-        // Find the bounty for this issue and repo
-        if (!issue || !repo || !repo.owner || !repo.name) {
-          this.logger.warn('[cross-referenced] Missing issue or repo info, skipping.');
-          return;
-        }
-        const bounty = await this.bountyModel.findOne({ issue: issue.number, repo: `https://github.com/${repo.owner.login}/${repo.name}` });
-        if (!bounty) {
-          this.logger.warn(`[cross-referenced] No bounty found for issue #${issue.number} in repo ${repo.owner.login}/${repo.name}`);
-          return;
-        }
-        // Check if this PR is already linked
-        if (bounty.pull_requests.some(pr => pr.number === prInfo.number && pr.repo === prInfo.repo)) {
-          this.logger.log(`[cross-referenced] PR #${prInfo.number} already linked to bounty for issue #${issue.number}`);
-          return;
-        }
-        // Add PR info to pull_requests
-        bounty.pull_requests.push(prInfo);
-        await bounty.save();
-        this.logger.log(`[cross-referenced] Linked PR #${prInfo.number} to bounty for issue #${issue.number}`);
-      } catch (err) {
-        this.logger.error(`[cross-referenced] Error handling event: ${err.message}`, err.stack);
       }
     });
 
@@ -370,5 +362,13 @@ Sample bounty document: ${JSON.stringify(sample)}
       ranked_languages,
       recommendation
     };
+  }
+
+  // Helper function to extract EVM address from text
+  private extractEvmAddress(text: string): string | null {
+    if (!text) return null;
+    // EVM addresses are 0x followed by 40 hex chars
+    const match = text.match(/0x[a-fA-F0-9]{40}/);
+    return match ? match[0] : null;
   }
 } 

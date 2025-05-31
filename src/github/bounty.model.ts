@@ -36,7 +36,8 @@ export class Bounty extends Document {
       repo: String,
       url: String,
       author: String,
-      createdAt: Date
+      createdAt: Date,
+      evm_address: { type: String, required: false },
     }],
     default: []
   })
@@ -46,6 +47,7 @@ export class Bounty extends Document {
     url: string;
     author: string;
     createdAt: Date;
+    evm_address?: string;
   }[];
 }
 
