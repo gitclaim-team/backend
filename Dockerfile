@@ -1,11 +1,13 @@
 # Use official Node.js 22 image
-FROM node:22-bullseye AS base
+FROM ubuntu:24.04 AS base
 
-# Install pnpm globally
-RUN npm install -g pnpm@10.11.0
-
-# Install curl
-RUN apt-get update && apt-get install -y curl git ca-certificates && rm -rf /var/lib/apt/lists/*
+# Install dependencies
+RUN apt-get update && \
+    apt-get install -y curl git ca-certificates libssl3 build-essential && \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g pnpm@10.11.0 && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install Foundry (forge)
 RUN curl -L https://foundry.paradigm.xyz | bash && /root/.foundry/bin/foundryup
