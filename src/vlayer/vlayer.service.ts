@@ -5,10 +5,14 @@ import { exec } from 'child_process';
 export class VlayerService {
   async fetchWebProof(urlToProve: string): Promise<any> {
     const notaryUrl = process.env.VLAYER_NOTARY_URL;
+    const vlayerPath = process.env.VLAYER_BIN_PATH;
     if (!notaryUrl) {
       throw new InternalServerErrorException('VLAYER_NOTARY_URL is not set in environment variables');
     }
-    const command = `vlayer web-proof-fetch --notary ${notaryUrl} --url ${urlToProve}`;
+    if (!vlayerPath) {
+      throw new InternalServerErrorException('VLAYER_BIN_PATH is not set in environment variables');
+    }
+    const command = `${vlayerPath} web-proof-fetch --notary ${notaryUrl} --url ${urlToProve}`;
     return new Promise((resolve, reject) => {
       exec(command, (error, stdout, stderr) => {
         if (error) {

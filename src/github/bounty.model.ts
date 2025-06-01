@@ -39,6 +39,7 @@ export class Bounty extends Document {
       createdAt: Date,
       evm_address: { type: String, required: false },
       webproof_source: { type: String, required: false },
+      webproof_json: { type: Object, required: false },
     }],
     default: []
   })
@@ -50,6 +51,7 @@ export class Bounty extends Document {
     createdAt: Date;
     evm_address?: string;
     webproof_source?: string;
+    webproof_json?: any;
   }[];
 }
 

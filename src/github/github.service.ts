@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { OpenAI } from 'openai';
 import { ethers } from 'ethers';
 import { FilecoinService } from '../upload/filecoin.service';
+import { VlayerService } from '../vlayer/vlayer.service';
 
 @Injectable()
 export class GithubService implements OnModuleInit {
@@ -18,6 +19,7 @@ export class GithubService implements OnModuleInit {
     @InjectModel(Bounty.name) private bountyModel: Model<Bounty>,
     private configService: ConfigService,
     private filecoinService: FilecoinService,
+    private vlayerService: VlayerService,
   ) {}
 
   onModuleInit() {
@@ -109,6 +111,33 @@ export class GithubService implements OnModuleInit {
                 prEntry.webproof_source = webproofUrl;
                 await bounty.save();
                 this.logger.log(`[pull_request] Uploaded webproof for PR #${pr.number} and updated bounty.`);
+
+                // Post cha-ching comment to PR
+                await context.octokit.issues.createComment({
+                  owner: repo.owner.login,
+                  repo: repo.name,
+                  issue_number: pr.number,
+                  body: `Hey @${prEntry.author}, your bounty will 'cha-ching' soon! 🤑 \n We're processing things on-chain, but you don't need to worry with that. 🥳`
+                });
+
+                // Trigger vlayer proof in background
+                setImmediate(async () => {
+                  try {
+                    const webproofJson = await this.vlayerService.fetchWebProof(webproofUrl);
+                    // Re-fetch bounty and PR entry to avoid stale doc
+                    const freshBounty = await this.bountyModel.findOne({ issue: issueNumber, repo: `https://github.com/${issueRepo}` });
+                    if (freshBounty) {
+                      const freshPrEntry = freshBounty.pull_requests.find(existing => existing.number === pr.number && existing.repo === issueRepo);
+                      if (freshPrEntry) {
+                        freshPrEntry.webproof_json = webproofJson;
+                        await freshBounty.save();
+                        this.logger.log(`[pull_request] Stored webproof_json for PR #${pr.number}`);
+                      }
+                    }
+                  } catch (err) {
+                    this.logger.error(`[pull_request] Failed to fetch/store vlayer webproof for PR #${pr.number}: ${err.message}`);
+                  }
+                });
               } catch (err) {
                 this.logger.error(`[pull_request] Failed to upload webproof for PR #${pr.number}: ${err.message}`);
               }
