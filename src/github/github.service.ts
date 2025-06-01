@@ -103,7 +103,7 @@ export class GithubService implements OnModuleInit {
               }
               // Compose the JSON for Filecoin
               const webproofJson = {
-                issue_url: `https://api.github.com/repos/${issueRepo}/issues/${issueNumber}`,
+                issue_url: `https://github.com/${issueRepo}/issues/${issueNumber}`,
                 recipient_address: prEntry.evm_address || evmAddress || '',
                 dev_name: prEntry.author || pr.user?.login || 'unknown',
               };

@@ -3,7 +3,7 @@ import { exec } from 'child_process';
 
 @Injectable()
 export class VlayerService {
-  async fetchWebProof(urlToProve: string): Promise<any> {
+  async fetchWebProof(urlToProve: string): Promise<string> {
     const notaryUrl = process.env.VLAYER_NOTARY_URL;
     const vlayerPath = process.env.VLAYER_BIN_PATH;
     if (!notaryUrl) {
@@ -24,12 +24,14 @@ export class VlayerService {
             reject(new InternalServerErrorException('No JSON object found in vlayer output'));
             return;
           }
-          try {
-            const lastJson = JSON.parse(matches[matches.length - 1]);
-            resolve(lastJson);
-          } catch (parseErr) {
-            reject(new InternalServerErrorException('Failed to parse JSON from vlayer output'));
+          const rawJson = matches[matches.length - 1];
+          if (!rawJson || rawJson.trim() === '{}') {
+            reject(new InternalServerErrorException('Proof was not generated or is empty'));
+            return;
           }
+          console.log('vlayer command ran successfully.');
+          console.log('Proof generated:', rawJson);
+          resolve(rawJson);
         }
       });
     });
