@@ -36,6 +36,7 @@ export async function handleVlayerProofAndNotify({
       if (freshPrEntry && freshPrEntry.webproof_source) {
         try {
           const webproofJson = await vlayerService.fetchWebProof(freshPrEntry.webproof_source);
+          logger.log(`[background] Fetched vlayer webproof for PR #${prNumber}: ${JSON.stringify(webproofJson)}`);
           // Call vlayer prove API before posting cha-ching comment
           try {
             const proveResponse = await axios.post('https://vlayer.cha-ching.it/api/prove', {
@@ -79,4 +80,4 @@ export async function handleVlayerProofAndNotify({
   } catch (err) {
     logger.error(`[background] Unexpected error in background task for PR #${prNumber}: ${err.message}`);
   }
-} 
+}
