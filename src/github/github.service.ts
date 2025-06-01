@@ -117,7 +117,7 @@ export class GithubService implements OnModuleInit {
                   owner: repo.owner.login,
                   repo: repo.name,
                   issue_number: pr.number,
-                  body: `Hey @${prEntry.author}, your bounty will 'cha-ching' soon! 🤑 \n We're processing things on-chain, but you don't need to worry with that. 🥳`
+                  body: `Hey @${prEntry.author}, you will be able to 'cha-ching' your bounty soon! 🤑 \n We're processing things on-chain, but you don't need to worry with that. 🥳`
                 });
 
                 // Trigger vlayer proof in background
