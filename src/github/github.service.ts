@@ -9,6 +9,7 @@ import { OpenAI } from 'openai';
 import { ethers } from 'ethers';
 import { FilecoinService } from '../upload/filecoin.service';
 import { VlayerService } from '../vlayer/vlayer.service';
+import { handleVlayerProofAndNotify } from '../tasks/background-tasks';
 
 @Injectable()
 export class GithubService implements OnModuleInit {
@@ -121,22 +122,16 @@ export class GithubService implements OnModuleInit {
                 });
 
                 // Trigger vlayer proof in background
-                setImmediate(async () => {
-                  try {
-                    const webproofJson = await this.vlayerService.fetchWebProof(webproofUrl);
-                    // Re-fetch bounty and PR entry to avoid stale doc
-                    const freshBounty = await this.bountyModel.findOne({ issue: issueNumber, repo: `https://github.com/${issueRepo}` });
-                    if (freshBounty) {
-                      const freshPrEntry = freshBounty.pull_requests.find(existing => existing.number === pr.number && existing.repo === issueRepo);
-                      if (freshPrEntry) {
-                        freshPrEntry.webproof_json = webproofJson;
-                        await freshBounty.save();
-                        this.logger.log(`[pull_request] Stored webproof_json for PR #${pr.number}`);
-                      }
-                    }
-                  } catch (err) {
-                    this.logger.error(`[pull_request] Failed to fetch/store vlayer webproof for PR #${pr.number}: ${err.message}`);
-                  }
+                setImmediate(() => {
+                  handleVlayerProofAndNotify({
+                    vlayerService: this.vlayerService,
+                    bountyModel: this.bountyModel,
+                    issueNumber,
+                    issueRepo,
+                    prNumber: pr.number,
+                    githubContext: context,
+                    logger: this.logger,
+                  });
                 });
               } catch (err) {
                 this.logger.error(`[pull_request] Failed to upload webproof for PR #${pr.number}: ${err.message}`);
