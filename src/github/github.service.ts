@@ -7,6 +7,7 @@ import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { OpenAI } from 'openai';
 import { ethers } from 'ethers';
+import { FilecoinService } from '../upload/filecoin.service';
 
 @Injectable()
 export class GithubService implements OnModuleInit {
@@ -16,6 +17,7 @@ export class GithubService implements OnModuleInit {
   constructor(
     @InjectModel(Bounty.name) private bountyModel: Model<Bounty>,
     private configService: ConfigService,
+    private filecoinService: FilecoinService,
   ) {}
 
   onModuleInit() {
@@ -36,6 +38,84 @@ export class GithubService implements OnModuleInit {
     this.probot.on('pull_request', async (context) => {
       try {
         const action = context.payload.action;
+        // Handle PR closed and merged
+        if (action === 'closed') {
+          const pr = context.payload.pull_request;
+          const repo = context.payload.repository;
+          if (!pr || !repo) {
+            this.logger.warn('[pull_request] Missing PR or repo info, skipping.');
+            return;
+          }
+          // Only proceed if merged
+          if (pr.merged_at && pr.merge_commit_sha) {
+            const prBody = pr.body || '';
+            // Extract EVM address from PR body
+            const evmAddress = this.extractEvmAddress(prBody);
+            // GitHub official keywords for closing issues
+            const keywords = [
+              'close', 'closes', 'closed',
+              'fix', 'fixes', 'fixed',
+              'resolve', 'resolves', 'resolved'
+            ];
+            const refRegex = new RegExp(
+              `\\b(?:${keywords.join('|')})\\b[:\\s]*((?:[\\w-]+\\/[\\w-]+)?#\\d+)`,
+              'gi'
+            );
+            const matches = [...prBody.matchAll(refRegex)];
+            if (matches.length === 0) {
+              this.logger.log(`[pull_request] No issue references found in PR #${pr.number}`);
+              return;
+            }
+            for (const match of matches) {
+              const ref = match[1]; // e.g., #44 or owner/repo#44
+              let issueNumber: number | null = null;
+              let issueRepo = `${repo.owner.login}/${repo.name}`;
+              // Parse reference
+              const crossRepoMatch = ref.match(/^([\w-]+)\/([\w-]+)#(\d+)$/);
+              if (crossRepoMatch) {
+                issueRepo = `${crossRepoMatch[1]}/${crossRepoMatch[2]}`;
+                issueNumber = parseInt(crossRepoMatch[3], 10);
+              } else {
+                const sameRepoMatch = ref.match(/^#(\d+)$/);
+                if (sameRepoMatch) {
+                  issueNumber = parseInt(sameRepoMatch[1], 10);
+                }
+              }
+              if (!issueNumber) {
+                this.logger.warn(`[pull_request] Could not parse issue reference '${ref}' in PR #${pr.number}`);
+                continue;
+              }
+              this.logger.log(`[pull_request] (CLOSED) PR #${pr.number} references issue #${issueNumber} in repo ${issueRepo}`);
+              // Find the bounty for this issue and repo
+              const bounty = await this.bountyModel.findOne({ issue: issueNumber, repo: `https://github.com/${issueRepo}` });
+              if (!bounty) {
+                this.logger.warn(`[pull_request] No bounty found for issue #${issueNumber} in repo ${issueRepo}`);
+                continue;
+              }
+              // Find the PR entry
+              let prEntry = bounty.pull_requests.find(existing => existing.number === pr.number && existing.repo === issueRepo);
+              if (!prEntry) {
+                this.logger.warn(`[pull_request] No PR entry found for PR #${pr.number} in bounty for issue #${issueNumber}`);
+                continue;
+              }
+              // Compose the JSON for Filecoin
+              const webproofJson = {
+                issue_url: `https://api.github.com/repos/${issueRepo}/issues/${issueNumber}`,
+                recipient_address: prEntry.evm_address || evmAddress || '',
+                dev_name: prEntry.author || pr.user?.login || 'unknown',
+              };
+              try {
+                const webproofUrl = await this.filecoinService.uploadJsonToFilecoin(webproofJson);
+                prEntry.webproof_source = webproofUrl;
+                await bounty.save();
+                this.logger.log(`[pull_request] Uploaded webproof for PR #${pr.number} and updated bounty.`);
+              } catch (err) {
+                this.logger.error(`[pull_request] Failed to upload webproof for PR #${pr.number}: ${err.message}`);
+              }
+            }
+          }
+          return;
+        }
         if (action !== 'opened' && action !== 'edited') return;
         const pr = context.payload.pull_request;
         const repo = context.payload.repository;

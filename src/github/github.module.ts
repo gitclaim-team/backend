@@ -5,11 +5,13 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Bounty, BountySchema } from './bounty.model';
 import { ConfigModule } from '@nestjs/config';
 import { GithubWebhookController } from './webhook.controller';
+import { FilecoinModule } from '../upload/filecoin.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Bounty.name, schema: BountySchema }]),
     ConfigModule,
+    FilecoinModule,
   ],
   providers: [GithubService],
   controllers: [GithubController, GithubWebhookController],

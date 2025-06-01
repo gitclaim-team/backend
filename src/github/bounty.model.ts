@@ -38,6 +38,7 @@ export class Bounty extends Document {
       author: String,
       createdAt: Date,
       evm_address: { type: String, required: false },
+      webproof_source: { type: String, required: false },
     }],
     default: []
   })
@@ -48,6 +49,7 @@ export class Bounty extends Document {
     author: string;
     createdAt: Date;
     evm_address?: string;
+    webproof_source?: string;
   }[];
 }
 

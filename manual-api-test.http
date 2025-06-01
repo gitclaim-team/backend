@@ -34,4 +34,4 @@ Accept: application/json
 
 {
   "prompt": "I'm good at coding in Java, and I'm learning Kotlin. Looking for bounties that match my skills."
-} 
+}
