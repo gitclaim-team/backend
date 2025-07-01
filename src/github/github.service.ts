@@ -113,7 +113,7 @@ export class GithubService implements OnModuleInit {
                 await bounty.save();
                 this.logger.log(`[pull_request] Uploaded webproof for PR #${pr.number} and updated bounty.`);
 
-                // Post cha-ching comment to PR
+                // Post gitclaim comment to PR
                 await context.octokit.issues.createComment({
                   owner: repo.owner.login,
                   repo: repo.name,

@@ -37,9 +37,9 @@ export async function handleVlayerProofAndNotify({
         try {
           const webproofJson = await vlayerService.fetchWebProof(freshPrEntry.webproof_source);
           logger.log(`[background] Fetched vlayer webproof for PR #${prNumber}: ${JSON.stringify(webproofJson)}`);
-          // Call vlayer prove API before posting cha-ching comment
+          // Call vlayer prove API before posting gitclaim comment
           try {
-            const proveResponse = await axios.post('https://vlayer.cha-ching.it/api/prove', {
+            const proveResponse = await axios.post(`${process.env.VLAYER_BACKEND_URL}/api/prove`, {
               url: freshPrEntry.webproof_source,
               proverAddress: '0x24b96acaf4f48006f840a7f87792f97c4aba93c0',
               verifierAddress: '0x2F6DcB84CDba09C749Df910a2d093fccfd4319bD',
@@ -57,12 +57,12 @@ export async function handleVlayerProofAndNotify({
               await freshBounty.save();
               logger.log(`[background] Stored webproof_json for PR #${prNumber}`);
 
-              // Post cha-ching comment to PR
+              // Post gitclaim comment to PR
               await githubContext.octokit.issues.createComment({
                 owner: githubContext.payload.repository.owner.login,
                 repo: githubContext.payload.repository.name,
                 issue_number: prNumber,
-                body: `Hey @${freshPrEntry.author},\n\nCHAAAA-CHIIIING! 🥳🥳🥳\n\nThe bounty was sent to your wallet. Enjoy! 🚀\n\nFeel free to come back and find more bounties at https://cha-ching.it`,
+                body: `Hey @${freshPrEntry.author},\n\nCHAAAA-CHIIIING! 🥳🥳🥳\n\nThe bounty was sent to your wallet. Enjoy! 🚀\n\nFeel free to come back and find more bounties at https://gitclaim.axlabs.com`,
               });
             } else {
               logger.error(

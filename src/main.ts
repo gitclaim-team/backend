@@ -8,7 +8,7 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       /^(https?:\/\/)?localhost(:\d+)?$/,
-      /^https?:\/\/(.*\.)?cha-ching\.it(:\d+)?$/
+      /^https?:\/\/(.*\.)?gitclaim\.axlabs\.com(:\d+)?$/
     ],
     credentials: true,
   });
