@@ -39,14 +39,29 @@ export async function handleVlayerProofAndNotify({
           logger.log(`[background] Fetched vlayer webproof for PR #${prNumber}: ${JSON.stringify(webproofJson)}`);
           // Call vlayer prove API before posting gitclaim comment
           try {
-            const proveResponse = await axios.post(`${process.env.VLAYER_BACKEND_URL}/api/prove`, {
+            const proveUrl = `${process.env.VLAYER_BACKEND_URL}/api/prove`;
+            const provePayload = {
               url: freshPrEntry.webproof_source,
               proverAddress: '0x24b96acaf4f48006f840a7f87792f97c4aba93c0',
               verifierAddress: '0x2F6DcB84CDba09C749Df910a2d093fccfd4319bD',
               functionName: 'main',
               webProofJson: webproofJson,
-            });
-            logger.log(`[background] vlayer prove API response: ${JSON.stringify(proveResponse.data)}`);
+            };
+            
+            // Log the request to vlayer backend
+            logger.log(`[background] === VLayer Backend API Request ===`);
+            logger.log(`[background] URL: ${proveUrl}`);
+            logger.log(`[background] Payload: ${JSON.stringify(provePayload, null, 2)}`);
+            logger.log(`[background] === VLayer Backend API Request End ===`);
+            
+            const proveResponse = await axios.post(proveUrl, provePayload);
+            
+            // Log the response from vlayer backend
+            logger.log(`[background] === VLayer Backend API Response ===`);
+            logger.log(`[background] Status: ${proveResponse.status}`);
+            logger.log(`[background] Headers: ${JSON.stringify(proveResponse.headers, null, 2)}`);
+            logger.log(`[background] Data: ${JSON.stringify(proveResponse.data, null, 2)}`);
+            logger.log(`[background] === VLayer Backend API Response End ===`);
             // Check for HTTP 200 and no verificationError with revert or error
             if (
               proveResponse.status === 200 &&
@@ -70,7 +85,18 @@ export async function handleVlayerProofAndNotify({
               );
             }
           } catch (apiErr) {
-            logger.error(`[background] Error calling vlayer prove API for PR #${prNumber}: ${apiErr.message}`);
+            logger.error(`[background] === VLayer Backend API Error ===`);
+            logger.error(`[background] Error calling vlayer prove API for PR #${prNumber}`);
+            logger.error(`[background] Error message: ${apiErr.message}`);
+            if (apiErr.response) {
+              logger.error(`[background] Response status: ${apiErr.response.status}`);
+              logger.error(`[background] Response data: ${JSON.stringify(apiErr.response.data, null, 2)}`);
+              logger.error(`[background] Response headers: ${JSON.stringify(apiErr.response.headers, null, 2)}`);
+            } else if (apiErr.request) {
+              logger.error(`[background] No response received`);
+              logger.error(`[background] Request: ${JSON.stringify(apiErr.request, null, 2)}`);
+            }
+            logger.error(`[background] === VLayer Backend API Error End ===`);
           }
         } catch (err) {
           logger.error(`[background] Failed to fetch/store vlayer webproof for PR #${prNumber}: ${err.message}`);
