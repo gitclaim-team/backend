@@ -15,16 +15,16 @@ ENV PATH="/root/.foundry/bin:${PATH}"
 
 # Install vlayer
 
-# We need to install an specific version of vlayer
-# and the vlayerup doesn't support that.
-# RUN curl -SL https://install.vlayer.xyz | bash
-# RUN . /root/.bashrc && vlayerup
+RUN curl -SL https://install.vlayer.xyz | bash
+RUN . /root/.bashrc && vlayerup
 
-RUN wget -nv -O /tmp/binaries-linux-amd64.tar.gz https://github.com/vlayer-xyz/vlayer/releases/download/v1.0.2/binaries-linux-amd64.tar.gz && \
-    mkdir -p /root/.vlayer && \
-    tar -xzf /tmp/binaries-linux-amd64.tar.gz -C /root/.vlayer && \
-    rm -rf /tmp/binaries-linux-amd64.tar.gz && \
-    chmod -R +x /root/.vlayer/bin
+# We needed to install an specific version of vlayer
+# and the vlayerup doesn't support that.
+# RUN wget -nv -O /tmp/binaries-linux-amd64.tar.gz https://github.com/vlayer-xyz/vlayer/releases/download/v1.0.2/binaries-linux-amd64.tar.gz && \
+#     mkdir -p /root/.vlayer && \
+#     tar -xzf /tmp/binaries-linux-amd64.tar.gz -C /root/.vlayer && \
+#     rm -rf /tmp/binaries-linux-amd64.tar.gz && \
+#     chmod -R +x /root/.vlayer/bin
 
 # Set working directory
 WORKDIR /app
