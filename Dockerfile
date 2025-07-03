@@ -20,11 +20,11 @@ ENV PATH="/root/.foundry/bin:${PATH}"
 # RUN curl -SL https://install.vlayer.xyz | bash
 # RUN . /root/.bashrc && vlayerup
 
-RUN wget -O /tmp/binaries-linux-amd64.tar.gz https://github.com/vlayer-xyz/vlayer/releases/download/v1.0.2/binaries-linux-amd64.tar.gz && \
+RUN wget -nv -O /tmp/binaries-linux-amd64.tar.gz https://github.com/vlayer-xyz/vlayer/releases/download/v1.0.2/binaries-linux-amd64.tar.gz && \
     mkdir -p /root/.vlayer && \
     tar -xzf /tmp/binaries-linux-amd64.tar.gz -C /root/.vlayer && \
     rm -rf /tmp/binaries-linux-amd64.tar.gz && \
-    chmod +x /root/.vlayer/vlayer
+    chmod -R +x /root/.vlayer/bin
 
 # Set working directory
 WORKDIR /app
