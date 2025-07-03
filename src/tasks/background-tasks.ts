@@ -40,10 +40,22 @@ export async function handleVlayerProofAndNotify({
           // Call vlayer prove API before posting gitclaim comment
           try {
             const proveUrl = `${process.env.VLAYER_BACKEND_URL}/api/prove`;
+            
+            // Validate required environment variables
+            if (!process.env.VLAYER_BACKEND_URL) {
+              throw new Error('VLAYER_BACKEND_URL is not set in environment variables');
+            }
+            if (!process.env.PROVER_ADDRESS) {
+              throw new Error('PROVER_ADDRESS is not set in environment variables');
+            }
+            if (!process.env.VERIFIER_ADDRESS) {
+              throw new Error('VERIFIER_ADDRESS is not set in environment variables');
+            }
+            
             const provePayload = {
               url: freshPrEntry.webproof_source,
-              proverAddress: '0x24b96acaf4f48006f840a7f87792f97c4aba93c0',
-              verifierAddress: '0x2F6DcB84CDba09C749Df910a2d093fccfd4319bD',
+              proverAddress: process.env.PROVER_ADDRESS,
+              verifierAddress: process.env.VERIFIER_ADDRESS,
               functionName: 'main',
               webProofJson: webproofJson,
             };
